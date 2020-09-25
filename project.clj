@@ -6,7 +6,7 @@
 
   :min-lein-version "2.9.0"
 
-  :parent-project {:coords [puppetlabs/clj-parent "4.0.1"]
+  :parent-project {:path "../clj-parent/project.clj"
                    :inherit [:managed-dependencies]}
 
   ;; Abort when version ranges or version conflicts are detected in
@@ -39,7 +39,7 @@
                  [beckon]
 
                  [puppetlabs/typesafe-config]
-                 [puppetlabs/kitchensink]
+                 [puppetlabs/kitchensink "3.1.1-SNAPSHOT"]
                  [puppetlabs/i18n]
                  [nrepl/nrepl]
                  ]

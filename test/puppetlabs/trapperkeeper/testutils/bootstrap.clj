@@ -1,7 +1,9 @@
 (ns puppetlabs.trapperkeeper.testutils.bootstrap
   (:require [me.raynes.fs :as fs]
+            [clojure.stacktrace :as st]
             [puppetlabs.trapperkeeper.core :as tk]
             [puppetlabs.trapperkeeper.app :as tk-app]
+            [puppetlabs.kitchensink.core :as ks]
             [puppetlabs.kitchensink.testutils :as ks-testutils]
             [puppetlabs.trapperkeeper.bootstrap :as bootstrap]
             [puppetlabs.trapperkeeper.config :as config]
@@ -10,10 +12,45 @@
 (def empty-config "./target/empty.ini")
 (fs/touch empty-config)
 
+;; f should throw an exception to trigger retry
+;;
+;; TODO: Make retry more generic?
+
+(defn retry
+  [f n interval]
+  (if (< n 0)
+    (throw (Exception. "retry failed!"))
+    (let [retry-result (f)]
+      (if (:successful retry-result)
+        (:value retry-result)
+        (do (Thread/sleep interval) (retry f (- n 1) interval))))))
+
+(defn test-retry-fn
+  [num-retries]
+  (let [num-retries-atom (atom (+ num-retries 1))]
+    (fn []
+      (if (<= (swap! num-retries-atom dec) 0)
+        {:successful true :value "done!"}
+        {:successful false}))))
+
+(defn bootstrap-services-retry-fn
+  [f config]
+  (fn []
+    (try
+      {:successful true :value (f config)}
+      (catch java.io.IOException e
+        (println "ERROR STARTING JETTY SERVER IN TRAPPERKEEPER [(HOST, PORT): " "(" (:host config) ", " (:port config) ")]")
+        (ks/print-listened-ports)
+        (ks/print-processes)
+        (st/print-stack-trace e)
+        (println "RETRYING...")
+        {:successful false}))))
+
 (defn bootstrap-services-with-config
   [services config]
   (internal/throw-app-error-if-exists!
-   (tk/boot-services-with-config services config)))
+    (throw (Exception. "lol fuck"))
+    (retry (bootstrap-services-retry-fn (fn [config] (tk/boot-services-with-config services config))) 3 100)))
 
 (defmacro with-app-with-config
   [app services config & body]
